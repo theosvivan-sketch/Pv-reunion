@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14213d">
+<title>PV Réunion</title>
+<style>
+/* Mise en page : une colonne, barre d'onglets fixe en bas, adaptée au pouce */
+:root{--bg:#f6f4ef;--card:#fff;--fg:#17202e;--mut:#5f6b7a;--line:#dcd8cc;--acc:#14213d;--acc2:#c8452b;--ok:#1f7a4d;--onacc:#fff;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--serif:Georgia,"Times New Roman",serif}
+@media (prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212c;--fg:#e9edf3;--mut:#9aa6b6;--line:#2a3342;--acc:#e8c872;--acc2:#ff7a5c;--ok:#5fd29a;--onacc:#10141b}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--font);padding-bottom:72px}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font:700 1.5rem/1.2 var(--serif);margin:.2rem 0 .2rem}
+h2{font:700 1.15rem/1.3 var(--serif);margin:0 0 .6rem}
+p.sub{color:var(--mut);margin:0 0 1rem;font-size:.92rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:0 0 14px}
+label{display:block;font-size:.85rem;color:var(--mut);margin:.6rem 0 .25rem}
+input,select,textarea{width:100%;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+textarea{min-height:240px;line-height:1.5}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:10px 14px;min-height:44px}
+button.pri{background:var(--acc);color:var(--onacc);border-color:var(--acc);font-weight:600}
+button.dng{background:var(--acc2);color:#fff;border-color:var(--acc2);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid var(--acc2);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 auto}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+nav button{flex:1;border:0;border-radius:0;background:none;min-height:56px;color:var(--mut);font-size:.9rem}
+nav button[aria-selected=true]{color:var(--acc);font-weight:700;box-shadow:inset 0 3px 0 var(--acc2)}
+.timer{font:700 3.2rem/1 ui-monospace,Menlo,Consolas,monospace;text-align:center;font-variant-numeric:tabular-nums;margin:.6rem 0}
+.state{text-align:center;color:var(--mut);margin:0 0 .6rem;min-height:1.5em}
+.rec .state{color:var(--acc2);font-weight:700}
+.meter{height:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:.4rem 0 1rem}
+.meter i{display:block;height:100%;width:0;background:var(--ok);transition:width .1s}
+.big{width:100%;min-height:64px;font-size:1.15rem}
+.item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border:0}.item>div{min-width:0}.item b{display:block;overflow-wrap:anywhere}
+.tag{font-size:.75rem;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}
+.tag.ok{color:var(--ok);border-color:var(--ok)}
+.note{font-size:.85rem;color:var(--mut)}
+.warn{border-left:4px solid var(--acc2);padding-left:10px}
+.log{font:.8rem/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;color:var(--mut);max-height:140px;overflow:auto}
+.pv{font-family:var(--serif);white-space:pre-wrap;line-height:1.6}
+.tabs{display:flex;gap:6px;margin-bottom:10px}.tabs button{flex:1;min-height:40px}
+.tabs button[aria-pressed=true]{background:var(--acc);color:var(--onacc);border-color:var(--acc)}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<h1>PV Réunion</h1>
+<p class="sub">Enregistrez, transcrivez, obtenez le procès-verbal. Tout reste sur votre téléphone, sauf l'audio envoyé au service de transcription que vous choisissez.</p>
+
+<section id="v-rec">
+ <div class="card" id="recCard">
+  <label for="title">Titre de la réunion</label>
+  <input id="title" placeholder="Ex. : Conseil d'administration du 12 novembre">
+  <label for="place">Lieu (facultatif)</label>
+  <input id="place" placeholder="Ex. : Salle de conférence, Abidjan">
+  <label for="people">Participants (facultatif, séparés par des virgules)</label>
+  <input id="people" placeholder="Ex. : Awa Koné, Jean Yao, Marie Traoré">
+  <div class="timer" id="timer">00:00:00</div>
+  <div class="state" id="state">Prêt à enregistrer</div>
+  <div class="meter" aria-hidden="true"><i id="lvl"></i></div>
+  <div class="row">
+   <button class="pri big" id="btnStart">● Démarrer l'enregistrement</button>
+  </div>
+  <div class="row" id="ctl" hidden>
+   <button id="btnPause">Pause</button>
+   <button class="dng" id="btnStop">Terminer</button>
+  </div>
+  <p class="note" id="wlNote">Gardez l'écran allumé et l'application ouverte pendant la réunion : Android coupe le micro quand l'écran s'éteint.</p>
+ </div>
+ <div class="card warn" id="recover" hidden>
+  <b>Un enregistrement n'a pas été terminé.</b>
+  <p class="note" id="recoverTxt"></p>
+  <div class="row"><button class="pri" id="btnRecover">Récupérer</button><button id="btnDiscard">Supprimer</button></div>
+ </div>
+</section>
+
+<section id="v-list" hidden>
+ <div class="card"><h2>Réunions</h2><div id="list"></div><p class="note" id="empty">Aucune réunion enregistrée.</p></div>
+</section>
+
+<section id="v-det" hidden>
+ <div class="card">
+  <button id="btnBack">← Retour</button>
+  <h2 id="dTitle" style="margin-top:12px"></h2>
+  <p class="note" id="dMeta"></p>
+  <audio id="aud" controls style="width:100%;margin:6px 0" hidden></audio>
+  <div class="row">
+   <button class="pri" id="btnTrans">Transcrire</button>
+   <button id="btnPV">Générer le PV</button>
+  </div>
+  <div class="log" id="log" style="margin-top:10px" hidden></div>
+ </div>
+ <div class="card">
+  <div class="tabs"><button id="tPV" aria-pressed="true">PV</button><button id="tTr" aria-pressed="false">Transcription</button></div>
+  <textarea id="txt" spellcheck="false" aria-label="Texte"></textarea>
+  <div class="row" style="margin-top:10px">
+   <button id="btnSave">Enregistrer les modifications</button>
+   <button id="btnCopy">Copier</button>
+   <button id="btnDl">Télécharger .txt</button>
+   <button id="btnDoc">Télécharger .doc</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+   <button id="btnAudio">Télécharger l'audio</button>
+   <button class="dng" id="btnDel">Supprimer</button>
+  </div>
+ </div>
+</section>
+
+<section id="v-set" hidden>
+ <div class="card">
+  <h2>Service de transcription et de rédaction</h2>
+  <p class="note">Gratuit avec une clé personnelle (2 minutes, sans carte bancaire). L'audio est envoyé à ce service pour être transcrit.</p>
+  <label for="prov">Service</label>
+  <select id="prov">
+   <option value="gemini">Google Gemini (recommandé : transcription + PV avec une seule clé)</option>
+   <option value="groq">Groq (Whisper pour la transcription, Llama pour le PV)</option>
+   <option value="none">Aucun (dictée en direct du navigateur, PV simple)</option>
+  </select>
+  <div id="keyBox">
+   <label for="key">Clé API</label>
+   <input id="key" type="password" autocomplete="off" placeholder="Collez votre clé ici">
+   <p class="note" id="keyHelp"></p>
+  </div>
+  <label for="model">Modèle de rédaction</label>
+  <input id="model" placeholder="gemini-3.8-flash">
+  <label for="lang">Langue de la réunion</label>
+  <select id="lang"><option value="fr">Français</option><option value="en">Anglais</option></select>
+  <label for="chunk">Découpage de l'audio (minutes par partie)</label>
+  <select id="chunk"><option value="5">5</option><option value="10" selected>10</option><option value="15">15</option></select>
+  <div class="row" style="margin-top:12px"><button class="pri" id="btnSet">Enregistrer les réglages</button><button id="btnTest">Tester la clé</button></div>
+  <p class="note" id="setMsg"></p>
+ </div>
+ <div class="card warn">
+  <b>Confidentialité</b>
+  <p class="note">Avec l'offre gratuite de Google, les contenus envoyés peuvent servir à améliorer leurs produits. Pour une réunion confidentielle, préférez Groq, ou ne transcrivez pas l'audio en ligne.</p>
+ </div>
+</section>
+</main>
+<nav role="tablist">
+ <button role="tab" id="n-rec" aria-selected="true">Enregistrer</button>
+ <button role="tab" id="n-list" aria-selected="false">Réunions</button>
+ <button role="tab" id="n-set" aria-selected="false">Réglages</button>
+</nav>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const fmtT=s=>{s=Math.max(0,Math.floor(s));return pad(Math.floor(s/3600))+":"+pad(Math.floor(s%3600/60))+":"+pad(s%60)};
+const fmtD=t=>new Date(t).toLocaleString("fr-FR",{dateStyle:"long",timeStyle:"short"});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const cfg={prov:store.get("prov","gemini"),key:store.get("key",""),model:store.get("model",""),lang:store.get("lang","fr"),chunk:+store.get("chunk","10")};
+
+/* ---------- Base locale (IndexedDB) ---------- */
+let _db=null;
+function db(){
+  if(_db)return Promise.resolve(_db);
+  return new Promise((ok,ko)=>{
+    const r=indexedDB.open("pvreunion",1);
+    r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore("meetings",{keyPath:"id"});d.createObjectStore("chunks",{autoIncrement:true}).createIndex("mid","mid")};
+    r.onsuccess=()=>{_db=r.result;ok(_db)};r.onerror=()=>ko(r.error);
+  });
+}
+async function tx(st,mode,fn){
+  const d=await db();
+  return new Promise((ok,ko)=>{
+    const t=d.transaction(st,mode);let out;
+    out=fn(t);t.oncomplete=()=>ok(out&&out.result!==undefined?out.result:out);t.onerror=()=>ko(t.error);t.onabort=()=>ko(t.error);
+  });
+}
+const putM=m=>tx("meetings","readwrite",t=>t.objectStore("meetings").put(m));
+const getM=id=>tx("meetings","readonly",t=>t.objectStore("meetings").get(id));
+const allM=()=>tx("meetings","readonly",t=>t.objectStore("meetings").getAll());
+const putC=c=>tx("chunks","readwrite",t=>t.objectStore("chunks").add(c));
+const chunksOf=mid=>tx("chunks","readonly",t=>t.objectStore("chunks").index("mid").getAll(mid));
+async function delM(id){
+  const d=await db();
+  return new Promise((ok,ko)=>{
+    const t=d.transaction(["meetings","chunks"],"readwrite");
+    t.objectStore("meetings").delete(id);
+    const cur=t.objectStore("chunks").index("mid").openKeyCursor(IDBKeyRange.only(id));
+    cur.onsuccess=()=>{const c=cur.result;if(c){t.objectStore("chunks").delete(c.primaryKey);c.continue()}};
+    t.oncomplete=ok;t.onerror=()=>ko(t.error);
+  });
+}
+async function partsOf(mid){
+  const cs=await chunksOf(mid),by={};
+  cs.forEach(c=>{(by[c.part]=by[c.part]||[]).push(c)});
+  return Object.keys(by).map(Number).sort((a,b)=>a-b).map(p=>{
+    const l=by[p].sort((a,b)=>a.seq-b.seq);
+    return{part:p,blob:new Blob(l.map(c=>c.blob),{type:l[0].blob.type||"audio/webm"})};
+  });
+}
+
+/* ---------- Enregistrement ---------- */
+const R={meeting:null,stream:null,rec:null,part:0,seq:0,t0:0,acc:0,paused:false,tick:null,rot:null,wl:null,ac:null,an:null,raf:0,mime:""};
+function pickMime(){
+  const c=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"];
+  return c.find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||"";
+}
+const elapsed=()=>R.acc+(R.paused||!R.t0?0:(Date.now()-R.t0)/1000);
+function startRecorder(){
+  const opt={audioBitsPerSecond:32000};if(R.mime)opt.mimeType=R.mime;
+  const rec=new MediaRecorder(R.stream,opt),part=R.part,mid=R.meeting.id;
+  let seq=0;
+  R.meeting.offsets=R.meeting.offsets||[];R.meeting.offsets[part]=elapsed();
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)putC({mid,part,seq:seq++,blob:e.data}).catch(()=>{})};
+  rec.start(5000);R.rec=rec;
+}
+function rotate(){
+  if(!R.rec||R.paused)return;
+  const old=R.rec;R.part++;
+  old.stop();startRecorder();
+  R.meeting.parts=R.part+1;putM(R.meeting);
+}
+function drawLevel(){
+  if(!R.an)return;
+  const b=new Uint8Array(R.an.fftSize);R.an.getByteTimeDomainData(b);
+  let m=0;for(const v of b)m=Math.max(m,Math.abs(v-128));
+  $("lvl").style.width=Math.min(100,m*1.2)+"%";
+  R.raf=requestAnimationFrame(drawLevel);
+}
+async function lockScreen(){
+  try{if("wakeLock" in navigator){R.wl=await navigator.wakeLock.request("screen");$("wlNote").textContent="Écran maintenu allumé. Laissez l'application ouverte."}}catch(e){}
+}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&R.rec&&!R.paused)lockScreen()});
+
+async function startRec(){
+  if(!navigator.mediaDevices||!window.MediaRecorder){setState("Ce navigateur ne permet pas l'enregistrement. Utilisez Chrome.");return}
+  try{
+    R.stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:false,noiseSuppression:false,autoGainControl:true}});
+  }catch(e){setState("Micro refusé. Autorisez le micro pour ce site dans les réglages de Chrome.");return}
+  R.mime=pickMime();
+  const now=Date.now();
+  R.meeting={id:"m"+now,title:$("title").value.trim()||"Réunion du "+new Date(now).toLocaleDateString("fr-FR"),place:$("place").value.trim(),people:$("people").value.trim(),start:now,durSec:0,parts:1,status:"rec",mime:R.mime,transcript:"",pv:""};
+  await putM(R.meeting);
+  R.part=0;R.acc=0;R.paused=false;R.t0=Date.now();
+  startRecorder();
+  R.rot=setInterval(rotate,cfg.chunk*60000);
+  R.tick=setInterval(()=>{
+    $("timer").textContent=fmtT(elapsed());
+    if(R.meeting){R.meeting.durSec=elapsed();if(Math.round(elapsed())%30===0)putM(R.meeting)}
+  },500);
+  try{R.ac=new (window.AudioContext||window.webkitAudioContext)();const s=R.ac.createMediaStreamSource(R.stream);R.an=R.ac.createAnalyser();R.an.fftSize=512;s.connect(R.an);drawLevel()}catch(e){}
+  await lockScreen();
+  $("recCard").classList.add("rec");$("btnStart").hidden=true;$("ctl").hidden=false;$("btnPause").textContent="Pause";
+  setState("● Enregistrement en cours");
+}
+function pauseRec(){
+  if(!R.rec)return;
+  if(!R.paused){R.rec.pause();R.acc+=(Date.now()-R.t0)/1000;R.paused=true;$("btnPause").textContent="Reprendre";setState("En pause")}
+  else{R.rec.resume();R.t0=Date.now();R.paused=false;$("btnPause").textContent="Pause";setState("● Enregistrement en cours");lockScreen()}
+}
+async function stopRec(){
+  if(!R.rec)return;
+  const dur=elapsed(),rec=R.rec;
+  clearInterval(R.tick);clearInterval(R.rot);cancelAnimationFrame(R.raf);
+  await new Promise(r=>{rec.onstop=r;try{rec.stop()}catch(e){r()}});
+  await sleep(300);
+  R.stream.getTracks().forEach(t=>t.stop());
+  try{R.ac&&R.ac.close()}catch(e){}
+  try{R.wl&&R.wl.release()}catch(e){}
+  R.meeting.durSec=dur;R.meeting.parts=R.part+1;R.meeting.status="done";
+  await putM(R.meeting);
+  const id=R.meeting.id;
+  Object.assign(R,{rec:null,stream:null,an:null,ac:null,wl:null,meeting:null,t0:0,acc:0});
+  $("recCard").classList.remove("rec");$("btnStart").hidden=false;$("ctl").hidden=true;
+  $("timer").textContent="00:00:00";$("lvl").style.width="0";setState("Enregistrement terminé et sauvegardé.");
+  $("title").value="";$("place").value="";$("people").value="";
+  openMeeting(id,true);
+}
+function setState(t){$("state").textContent=t}
+async function checkRecover(){
+  const ms=(await allM()).filter(m=>m.status==="rec");
+  if(!ms.length||R.rec){$("recover").hidden=true;return}
+  const m=ms[0];
+  $("recoverTxt").textContent="« "+m.title+" » du "+fmtD(m.start)+". L'audio déjà capté est conservé.";
+  $("recover").hidden=false;
+  $("btnRecover").onclick=async()=>{m.status="done";await putM(m);$("recover").hidden=true;openMeeting(m.id,false)};
+  $("btnDiscard").onclick=async()=>{await delM(m.id);$("recover").hidden=true};
+}
+
+/* ---------- Appels aux services gratuits ---------- */
+const GEM_MODELS=["gemini-3.8-flash","gemini-3.6-flash","gemini-3.5-flash-lite"];
+const GROQ_LLM="llama-3.3-70b-versatile",GROQ_STT="whisper-large-v3-turbo";
+function b64(blob){return new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(",")[1]);r.onerror=ko;r.readAsDataURL(blob)})}
+function gMime(t){t=(t||"audio/webm").split(";")[0];return t==="audio/mp4"?"audio/m4a":t}
+function retrySec(msg,def){
+  const m=/(?:retry|try again)[^0-9]{0,30}(?:(\d+)m)?\s*(\d+(?:\.\d+)?)s/i.exec(msg||"");
+  return m?Math.min(120,(m[1]?60*+m[1]:0)+Math.ceil(+m[2])+2):def;
+}
+async function http(url,opt,log,tries){
+  tries=tries||5;let last="";
+  for(let i=0;i<tries;i++){
+    let r;
+    try{r=await fetch(url,opt)}catch(e){last="Réseau indisponible";log&&log(last+", nouvel essai...");await sleep(4000*(i+1));continue}
+    if(r.ok)return r.json();
+    const t=await r.text();last=t.slice(0,300);
+    if(r.status===429||r.status===503||r.status===500){const w=retrySec(t,25);log&&log("Service saturé ("+r.status+"), attente de "+w+" s...");await sleep(w*1000);continue}
+    const e=new Error(r.status+" "+last);e.status=r.status;throw e;
+  }
+  throw new Error("Échec après plusieurs essais : "+last);
+}
+async function gemini(parts,log){
+  const list=[cfg.model||GEM_MODELS[0]].concat(GEM_MODELS).filter((v,i,a)=>a.indexOf(v)===i);
+  let err;
+  for(const mod of list){
+    try{
+      const j=await http("https://generativelanguage.googleapis.com/v1beta/models/"+mod+":generateContent?key="+encodeURIComponent(cfg.key),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts}],generationConfig:{temperature:0.2,maxOutputTokens:16000}})},log);
+      const c=j.candidates&&j.candidates[0];
+      const t=c&&c.content&&c.content.parts?c.content.parts.map(p=>p.text||"").join(""):"";
+      if(!t)throw new Error("Réponse vide ("+(c&&c.finishReason||"inconnue")+")");
+      return t.trim();
+    }catch(e){err=e;if(e.status===404||e.status===400&&/model/i.test(e.message)){log&&log("Modèle "+mod+" indisponible, essai du suivant.");continue}throw e}
+  }
+  throw err;
+}
+function offsetStamps(txt,off){
+  return txt.replace(/\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]/g,(_,a,b,c)=>{
+    const s=c!==undefined?(+a)*3600+(+b)*60+(+c):(+a)*60+(+b);
+    return "["+fmtT(s+off)+"]";
+  });
+}
+async function sttPart(blob,off,log){
+  if(cfg.prov==="groq"){
+    const fd=new FormData();
+    fd.append("file",blob,"partie."+(blob.type.includes("mp4")?"m4a":"webm"));
+    fd.append("model",GROQ_STT);fd.append("language",cfg.lang);fd.append("response_format","verbose_json");fd.append("temperature","0");
+    const j=await http("https://api.groq.com/openai/v1/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+cfg.key},body:fd},log);
+    if(j.segments&&j.segments.length)return j.segments.map(s=>"["+fmtT(s.start+off)+"] "+s.text.trim()).join("\n");
+    return "["+fmtT(off)+"] "+(j.text||"").trim();
+  }
+  const lg=cfg.lang==="en"?"anglais":"français";
+  const p="Transcris fidèlement et intégralement cet enregistrement de réunion en "+lg+". Une ligne par prise de parole, commençant par l'horodatage [mm:ss] relatif au début de cet extrait. Si tu distingues plusieurs voix, étiquette-les Intervenant 1, Intervenant 2, etc. Ne résume pas, n'invente rien, écris [inaudible] quand un passage est incompréhensible. Réponds uniquement par la transcription.";
+  const t=await gemini([{text:p},{inline_data:{mime_type:gMime(blob.type),data:await b64(blob)}}],log);
+  return offsetStamps(t,off);
+}
+async function transcribe(m,log){
+  if(cfg.prov==="none")throw new Error("Choisissez un service dans Réglages pour transcrire l'audio.");
+  if(!cfg.key)throw new Error("Ajoutez votre clé gratuite dans Réglages.");
+  const parts=await partsOf(m.id);
+  if(!parts.length)throw new Error("Aucun audio enregistré pour cette réunion.");
+  m.tparts=m.tparts||[];
+  for(let i=0;i<parts.length;i++){
+    if(m.tparts[i])continue;
+    log("Transcription de la partie "+(i+1)+" sur "+parts.length+"...");
+    const off=m.offsets&&m.offsets[parts[i].part]!==undefined?m.offsets[parts[i].part]:i*cfg.chunk*60;
+    m.tparts[i]=await sttPart(parts[i].blob,off,log);
+    m.transcript=m.tparts.filter(Boolean).join("\n");
+    await putM(m);showText(m);
+  }
+  log("Transcription terminée.");
+}
+
+/* ---------- Rédaction du PV ---------- */
+function pvPrompt(m,body,final){
+  const head="Titre : "+m.title+"\nDate : "+fmtD(m.start)+"\nDurée : "+fmtT(m.durSec||0)+"\nLieu : "+(m.place||"non précisé")+"\nParticipants annoncés : "+(m.people||"non précisés");
+  const rules="Tu es secrétaire de séance. Rédige un procès-verbal clair, formel et fidèle, en français, au passé, à la troisième personne. N'invente aucune information : écris « Non précisé » quand une donnée manque. Texte brut uniquement, sans markdown ni astérisques ; les titres de section sont en majuscules.";
+  if(!final)return rules+"\n\nVoici un extrait de transcription. Produis des notes structurées : sujets abordés, arguments clés, décisions, actions (qui, quoi, quand), questions ouvertes, avec les horodatages.\n\n"+body;
+  return rules+"\n\nInformations de la réunion :\n"+head+"\n\nStructure exacte du PV :\nPROCÈS-VERBAL DE RÉUNION\n(titre, date, heure et durée, lieu, participants identifiés)\n1. OBJET ET ORDRE DU JOUR\n2. DÉROULÉ DES DISCUSSIONS (un paragraphe court par sujet)\n3. DÉCISIONS PRISES (liste numérotée)\n4. ACTIONS À MENER (une ligne par action : Action - Responsable - Échéance)\n5. POINTS EN SUSPENS\n6. PROCHAINE RÉUNION\nClôture de séance.\n\nMatière :\n"+body;
+}
+async function llm(prompt,log){
+  if(cfg.prov==="groq"){
+    const j=await http("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{Authorization:"Bearer "+cfg.key,"Content-Type":"application/json"},body:JSON.stringify({model:cfg.model||GROQ_LLM,temperature:0.2,messages:[{role:"user",content:prompt}]})},log);
+    return j.choices[0].message.content.trim();
+  }
+  return gemini([{text:prompt}],log);
+}
+function splitWords(txt,n){
+  const lines=txt.split("\n"),out=[];let cur=[],w=0;
+  for(const l of lines){const k=l.split(/\s+/).length;if(w+k>n&&cur.length){out.push(cur.join("\n"));cur=[];w=0}cur.push(l);w+=k}
+  if(cur.length)out.push(cur.join("\n"));
+  return out;
+}
+async function makePV(m,log){
+  if(!m.transcript.trim())throw new Error("Transcrivez d'abord la réunion.");
+  if(cfg.prov==="none"||!cfg.key){log("PV simple généré localement.");return localPV(m)}
+  const limit=cfg.prov==="groq"?3000:40000;
+  let body=m.transcript;
+  if(body.split(/\s+/).length>limit){
+    const blocks=splitWords(body,limit),notes=[];
+    for(let i=0;i<blocks.length;i++){log("Analyse du bloc "+(i+1)+" sur "+blocks.length+"...");notes.push(await llm(pvPrompt(m,blocks[i],false),log));if(cfg.prov==="groq")await sleep(8000)}
+    body=notes.join("\n\n");
+  }
+  log("Rédaction du PV...");
+  return llm(pvPrompt(m,body,true),log);
+}
+function localPV(m){
+  const lines=m.transcript.split("\n").map(l=>l.trim()).filter(Boolean);
+  const pick=re=>lines.filter(l=>re.test(l)).slice(0,25).map(l=>"- "+l);
+  const dec=pick(/\b(décid|décision|validé|adopté|approuvé|convenu|d'accord pour|on retient)/i);
+  const act=pick(/\b(doit|devra|devrons|sera chargé|se charge|responsable|à faire|il faut|d'ici|avant le|pour le)\b/i);
+  const nxt=pick(/prochaine réunion|prochain rendez-vous|on se revoit|se retrouver/i);
+  const pr=m.people?m.people:"Non précisés";
+  const gist=lines.filter((l,i)=>i%Math.max(1,Math.ceil(lines.length/12))===0).slice(0,12).map(l=>"- "+l);
+  return["PROCÈS-VERBAL DE RÉUNION","","Titre : "+m.title,"Date : "+fmtD(m.start),"Durée : "+fmtT(m.durSec||0),"Lieu : "+(m.place||"Non précisé"),"Participants : "+pr,"",
+  "1. DÉROULÉ (extraits)",gist.join("\n")||"- Non précisé","","2. DÉCISIONS REPÉRÉES",dec.join("\n")||"- Aucune décision repérée automatiquement","","3. ACTIONS REPÉRÉES",act.join("\n")||"- Aucune action repérée automatiquement","","4. PROCHAINE RÉUNION",nxt.join("\n")||"- Non précisée","","Ce PV simple est produit sans IA. Ajoutez une clé gratuite dans Réglages pour obtenir un PV rédigé.","","Clôture de séance."].join("\n");
+}
+
+/* ---------- Mode sans clé : dictée en direct du navigateur ---------- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const D={on:false,rec:null,m:null,t0:0,acc:0,paused:false,tick:null,wl:null};
+const dEl=()=>D.acc+(D.paused?0:(Date.now()-D.t0)/1000);
+async function dictStart(){
+  if(!SR){setState("La dictée n'est pas disponible ici. Utilisez Chrome.");return}
+  const now=Date.now();
+  D.m={id:"m"+now,title:$("title").value.trim()||"Réunion du "+new Date(now).toLocaleDateString("fr-FR"),place:$("place").value.trim(),people:$("people").value.trim(),start:now,durSec:0,parts:0,status:"rec",live:true,transcript:"",pv:""};
+  await putM(D.m);
+  D.on=true;D.acc=0;D.t0=Date.now();D.paused=false;
+  const r=new SR();r.lang=cfg.lang==="en"?"en-US":"fr-FR";r.continuous=true;r.interimResults=true;
+  r.onresult=e=>{
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const x=e.results[i],t=x[0].transcript.trim();
+      if(x.isFinal&&t){D.m.transcript+=(D.m.transcript?"\n":"")+"["+fmtT(dEl())+"] "+t;putM(D.m);setState("● Dictée en cours")}
+      else if(t)setState("… "+t.slice(-70));
+    }
+  };
+  r.onend=()=>{if(D.on&&!D.paused){try{r.start()}catch(e){}}};
+  r.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed"){D.on=false;setState("Micro refusé. Autorisez-le dans les réglages de Chrome.")}};
+  D.rec=r;
+  try{r.start()}catch(e){setState("Impossible de démarrer la dictée.");return}
+  D.tick=setInterval(()=>{$("timer").textContent=fmtT(dEl());D.m.durSec=dEl()},500);
+  try{if("wakeLock" in navigator)D.wl=await navigator.wakeLock.request("screen")}catch(e){}
+  $("recCard").classList.add("rec");$("btnStart").hidden=true;$("ctl").hidden=false;$("btnPause").textContent="Pause";setState("● Dictée en cours");
+}
+function dictPause(){
+  if(!D.on)return;
+  if(!D.paused){D.paused=true;D.acc+=(Date.now()-D.t0)/1000;try{D.rec.stop()}catch(e){}$("btnPause").textContent="Reprendre";setState("En pause")}
+  else{D.paused=false;D.t0=Date.now();try{D.rec.start()}catch(e){}$("btnPause").textContent="Pause";setState("● Dictée en cours")}
+}
+async function dictStop(){
+  if(!D.on&&!D.m)return;
+  D.on=false;clearInterval(D.tick);try{D.rec.stop()}catch(e){}try{D.wl&&D.wl.release()}catch(e){}
+  await sleep(600);
+  D.m.durSec=dEl();D.m.status="done";await putM(D.m);
+  const id=D.m.id;D.m=null;
+  $("recCard").classList.remove("rec");$("btnStart").hidden=false;$("ctl").hidden=true;$("timer").textContent="00:00:00";setState("Dictée terminée et sauvegardée.");
+  $("title").value="";$("place").value="";$("people").value="";
+  openMeeting(id,true);
+}
+
+/* ---------- Navigation ---------- */
+function show(v){
+  ["rec","list","set"].forEach(k=>{$("n-"+k).setAttribute("aria-selected",String(k===v))});
+  $("v-rec").hidden=v!=="rec";$("v-list").hidden=v!=="list";$("v-set").hidden=v!=="set";$("v-det").hidden=true;
+  if(v==="list")renderList();
+  if(v==="rec")checkRecover();
+  window.scrollTo(0,0);
+}
+["rec","list","set"].forEach(k=>{$("n-"+k).onclick=()=>show(k)});
+async function renderList(){
+  const ms=(await allM()).filter(m=>m.status!=="rec").sort((a,b)=>b.start-a.start);
+  $("empty").hidden=ms.length>0;
+  $("list").innerHTML=ms.map(m=>'<div class="item"><div><b>'+esc(m.title)+'</b><span class="note">'+fmtD(m.start)+" · "+fmtT(m.durSec||0)+'</span></div><div class="row" style="flex:none;gap:4px">'+(m.transcript?'<span class="tag ok">Transcrit</span>':"")+(m.pv?'<span class="tag ok">PV</span>':"")+'<button data-id="'+m.id+'">Ouvrir</button></div></div>').join("");
+  $("list").querySelectorAll("button[data-id]").forEach(b=>{b.onclick=()=>openMeeting(b.dataset.id,false)});
+}
+
+/* ---------- Détail d'une réunion ---------- */
+let cur=null,view="pv",busy=false,audioUrls=[];
+function log(t){const l=$("log");l.hidden=false;l.textContent+=t+"\n";l.scrollTop=l.scrollHeight}
+function showText(m){if(cur&&cur.id===m.id){$("txt").value=view==="pv"?(m.pv||""):(m.transcript||"")}}
+function setView(v){
+  if(cur){cur[view==="pv"?"pv":"transcript"]=$("txt").value}
+  view=v;$("tPV").setAttribute("aria-pressed",String(v==="pv"));$("tTr").setAttribute("aria-pressed",String(v==="tr"));
+  $("txt").value=cur?(v==="pv"?cur.pv:cur.transcript)||"":"";
+}
+$("tPV").onclick=()=>setView("pv");$("tTr").onclick=()=>setView("tr");
+async function openMeeting(id,auto){
+  cur=await getM(id);if(!cur)return;
+  ["rec","list","set"].forEach(k=>{$("v-"+k).hidden=true;$("n-"+k).setAttribute("aria-selected","false")});
+  $("v-det").hidden=false;$("log").textContent="";$("log").hidden=true;
+  $("dTitle").textContent=cur.title;
+  $("dMeta").textContent=fmtD(cur.start)+" · "+fmtT(cur.durSec||0)+(cur.place?" · "+cur.place:"");
+  view=cur.pv?"pv":(cur.transcript?"tr":"pv");$("tPV").setAttribute("aria-pressed",String(view==="pv"));$("tTr").setAttribute("aria-pressed",String(view==="tr"));
+  $("txt").value=view==="pv"?(cur.pv||""):(cur.transcript||"");
+  audioUrls.forEach(u=>URL.revokeObjectURL(u));audioUrls=[];
+  const a=$("aud");a.hidden=true;a.removeAttribute("src");
+  $("btnTrans").hidden=!!cur.live;$("btnAudio").hidden=!!cur.live;
+  if(!cur.live){
+    const ps=await partsOf(cur.id);
+    audioUrls=ps.map(p=>URL.createObjectURL(p.blob));
+    if(audioUrls.length){let i=0;a.src=audioUrls[0];a.hidden=false;a.onended=()=>{if(++i<audioUrls.length){a.src=audioUrls[i];a.play()}}}
+  }
+  window.scrollTo(0,0);
+  if(auto&&!cur.pv)runAll();
+}
+async function guard(fn){
+  if(busy||!cur)return;busy=true;
+  ["btnTrans","btnPV"].forEach(b=>$(b).disabled=true);
+  try{await fn()}catch(e){log("Erreur : "+(e.message||e));log("Vos données sont conservées. Appuyez de nouveau pour reprendre.")}
+  busy=false;["btnTrans","btnPV"].forEach(b=>$(b).disabled=false);
+}
+const runTrans=()=>guard(async()=>{await transcribe(cur,log);setView("tr")});
+const runPV=()=>guard(async()=>{cur.pv=await makePV(cur,log);await putM(cur);setView("pv");log("PV prêt. Relisez-le et corrigez si besoin.")});
+function runAll(){
+  if(busy||!cur)return;
+  if(cur.live||cfg.prov==="none"||!cfg.key){if(cur.transcript)runPV();return}
+  guard(async()=>{
+    await transcribe(cur,log);
+    cur.pv=await makePV(cur,log);await putM(cur);setView("pv");log("PV prêt. Relisez-le et corrigez si besoin.");
+  });
+}
+$("btnTrans").onclick=runTrans;$("btnPV").onclick=runPV;$("btnBack").onclick=()=>show("list");
+$("btnSave").onclick=async()=>{if(!cur)return;cur[view==="pv"?"pv":"transcript"]=$("txt").value;await putM(cur);log("Modifications enregistrées.")};
+$("btnCopy").onclick=async()=>{
+  const t=$("txt").value;
+  try{await navigator.clipboard.writeText(t)}catch(e){$("txt").select();document.execCommand("copy")}
+  log("Texte copié.");
+};
+function save(name,blob){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
+const slug=()=>(cur.title||"reunion").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/gi,"-").replace(/^-|-$/g,"").toLowerCase()+(view==="pv"?"-pv":"-transcription");
+$("btnDl").onclick=()=>{if(cur)save(slug()+".txt",new Blob([$("txt").value],{type:"text/plain;charset=utf-8"}))};
+$("btnDoc").onclick=()=>{
+  if(!cur)return;
+  const body=$("txt").value.split("\n").map(l=>"<p style=\"margin:0 0 6pt\">"+(esc(l)||"&nbsp;")+"</p>").join("");
+  const html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>'+esc(cur.title)+'</title></head><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt">'+body+"</body></html>";
+  save(slug()+".doc",new Blob(["﻿"+html],{type:"application/msword"}));
+};
+$("btnAudio").onclick=async()=>{
+  if(!cur)return;const ps=await partsOf(cur.id),ext=(cur.mime||"").includes("mp4")?"m4a":"webm";
+  ps.forEach((p,i)=>setTimeout(()=>save(slug().replace(/-(pv|transcription)$/,"")+"-partie"+(i+1)+"."+ext,p.blob),i*700));
+};
+let delArm=0;
+$("btnDel").onclick=async()=>{
+  if(!cur)return;
+  if(Date.now()-delArm>4000){delArm=Date.now();$("btnDel").textContent="Confirmer la suppression";setTimeout(()=>{$("btnDel").textContent="Supprimer"},4000);return}
+  await delM(cur.id);cur=null;$("btnDel").textContent="Supprimer";show("list");
+};
+
+/* ---------- Réglages ---------- */
+const HELP={gemini:'Créez une clé gratuite sur <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> (compte Google), puis collez-la ici.',groq:'Créez une clé gratuite sur <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>, puis collez-la ici. Les limites gratuites sont plus serrées : une réunion de plus de 2 h peut demander de reprendre le lendemain.',none:""};
+function loadSet(){
+  $("prov").value=cfg.prov;$("key").value=cfg.key;$("model").value=cfg.model;$("lang").value=cfg.lang;$("chunk").value=String(cfg.chunk);syncSet();
+}
+function syncSet(){
+  const p=$("prov").value;$("keyBox").hidden=p==="none";$("keyHelp").innerHTML=HELP[p];
+  $("model").placeholder=p==="groq"?GROQ_LLM:GEM_MODELS[0];
+}
+$("prov").onchange=()=>{$("model").value="";syncSet()};
+function readSet(){cfg.prov=$("prov").value;cfg.key=$("key").value.trim();cfg.model=$("model").value.trim();cfg.lang=$("lang").value;cfg.chunk=+$("chunk").value;
+  ["prov","key","model","lang","chunk"].forEach(k=>store.set(k,String(cfg[k])))}
+$("btnSet").onclick=()=>{readSet();$("setMsg").textContent="Réglages enregistrés."};
+$("btnTest").onclick=async()=>{
+  readSet();const m=$("setMsg");
+  if(cfg.prov==="none"){m.textContent="Aucune clé nécessaire dans ce mode.";return}
+  if(!cfg.key){m.textContent="Collez d'abord votre clé.";return}
+  m.textContent="Test en cours...";
+  try{const r=await llm("Réponds uniquement par le mot : OK",null);m.textContent="Clé valide. Réponse du service : "+r.slice(0,40)}
+  catch(e){m.textContent="La clé ne fonctionne pas : "+String(e.message||e).slice(0,160)}
+};
+
+/* ---------- Démarrage ---------- */
+$("btnStart").onclick=()=>cfg.prov==="none"?dictStart():startRec();
+$("btnPause").onclick=()=>D.on?dictPause():pauseRec();
+$("btnStop").onclick=()=>D.on?dictStop():stopRec();
+window.addEventListener("beforeunload",e=>{if(R.rec||D.on){e.preventDefault();e.returnValue=""}});
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+loadSet();checkRecover().catch(()=>{});
+</script>
+</body>
+</html>
